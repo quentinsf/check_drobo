@@ -1,62 +1,87 @@
 #! /usr/bin/python
 #
-# Check a few things about a Drobo and return a Nagios-compliant status
+# Check a few things about a Drobo and return a Nagios-compliant status.
+# All the difficult stuff is done by Peter A. Silva's excellent drobo-utils.
+# Install the drobo-utils package, and that will give you the python libraries.
 #
 # This needs to be run with root priviledges.  You might like to put something
 # like the following in /etc/sudoers:
 # 
 #    nagios ALL=(ALL) NOPASSWD: <pathname>/check_drobo
 #
-# Install drobo-utils package, and that will give you the python libraries.
-#  Much of this is copied from 'drobom'
 
-import sys 
+import sys, os
+
 from optparse import OptionParser
 
 def togig(b):
     return b/(1024.0*1024*1024)
 
-def return_OK(info,data=""):
+def OK(info,data=""):
     print "DROBO OK: %s|%s" % (info, data)
-    sys.exit(0)
+    return 0
 
-def return_WARNING(info,data=""):
+def WARNING(info,data=""):
     print "DROBO WARNING: %s|%s" % (info, data)
-    sys.exit(1)
+    return 1
 
-def return_CRITICAL(info,data=""):
+def CRITICAL(info,data=""):
     print "DROBO CRITICAL: %s|%s" % (info, data)
-    sys.exit(2)
+    return 2
 
-def return_UNKNOWN(info,data=""):
+def UNKNOWN(info,data=""):
     print "DROBO UNKNOWN: %s|%s" % (info, data)
-    sys.exit(3)
+    return 3
 
-parser = OptionParser()
+def main():
+    parser = OptionParser(
+        description="Check used capacity on first Drobo. Any other errors will be counted as critical.")
+    parser.add_option("-w","--warning",dest="warning",
+        type="int", default="75", help="Percentage full to trigger warning")
+    parser.add_option("-c","--critical",dest="critical",
+        type="int", default="90", help="Percentage full to trigger critical status")
+    (options, args) = parser.parse_args()
 
-import Drobo
-l = Drobo.DiscoverLUNs()
-# We just use the first drobo we see
-d = Drobo.Drobo(l[0])
+    if os.getuid() != 0:
+        return CRITICAL("Needs to be run with root privileges")
 
-# Look at capacity
-# gets e.g. (2224707915776L, 2261363666944L, 4486071582720L, 0)
-(dfree,dused,dvirtual,dunprotected) = d.GetSubPageCapacity()
+    import Drobo
+    l = Drobo.DiscoverLUNs()
+    # We just use the first drobo we see
+    d = Drobo.Drobo(l[0])
 
-# Misc info
-# gets e.g. (4184880, 8, 'Drobo disk pack')
-(dtime, doffset, dname) = d.GetSubPageSettings()
+    # Look at capacity
+    # gets e.g. (2224707915776L, 2261363666944L, 4486071582720L, 0)
+    (dfree,dused,dvirtual,dunprotected) = d.GetSubPageCapacity()
 
-# General status
-# gets, e.g., ([], 0) 
-status = d.GetSubPageStatus()
+    # Misc info
+    # gets e.g. (4184880, 8, 'Drobo disk pack')
+    (dtime, doffset, dname) = d.GetSubPageSettings()
 
-# How full, as a percentage?
-if dvirtual > 0 :
-    pfull = 100 * ((dused+1.0)/dvirtual)
-else:
-    return_UNKNOWN("Firmware too old or drobo empty")
+    # General status
+    # gets, e.g., ([], 0) 
+    status = d.GetSubPageStatus()
 
-return_OK("%s is %2.2f%% full" % (dname,pfull), 
-          "%2.2f;%2.2f;%2.2f;%2.2f" % (togig(dfree),togig(dused),togig(dvirtual),togig(dunprotected)))
+    # Any general errors are critical
+    if status[0] or status[1]:
+        return CRITICAL(",".join(status[0]))
 
+    # How full is the pack, as a percentage?
+    if dvirtual > 0 :
+        pfull = 100 * ((dused+1.0)/dvirtual)
+    else:
+        return UNKNOWN("Firmware too old or drobo empty")
+
+    if pfull > options.critical:
+        return CRITICAL("%s is %2.2f%% full" % (dname, pfull))
+
+    if pfull > options.warning:
+        return WARNING("%s is %2.2f%% full" % (dname, pfull))
+
+
+    return OK("%s is %2.2f%% full" % (dname,pfull), 
+              "%2.2f;%2.2f;%2.2f;%2.2f" % (togig(dfree),togig(dused),togig(dvirtual),togig(dunprotected)))
+
+
+if __name__ == '__main__':
+    sys.exit(main())
