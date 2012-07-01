@@ -1,0 +1,37 @@
+#! /usr/bin/python
+# Running:
+#    sudo drobom status
+# gives, e.g.
+#    /dev/sdb:/dev/sdc:/dev/sdd /drobo1:/drobo2:/drobo3 Drobo disk pack 50% full - ([], 0)
+#
+# Install drobo-utils.  Much of this is copied from 'drobom'
+
+def togig(b):
+    return b/(1024.0*1024*1024)
+
+import Drobo
+l = Drobo.DiscoverLUNs()
+# We just use the first drobo we see
+d = Drobo.Drobo(l[0])
+
+# Look at capacity
+# gets e.g. (2224707915776L, 2261363666944L, 4486071582720L, 0)
+(dfree,dused,dvirtual,dunprotected) = d.GetSubPageCapacity()
+
+# Misc info
+# gets e.g. (4184880, 8, 'Drobo disk pack')
+(dtime, doffset, dname) = d.GetSubPageSettings()
+
+# General status
+# gets, e.g., ([], 0) 
+status = d.GetSubPageStatus()
+
+# How full, as a percentage?
+if dvirtual > 0 :
+    pfull = 100 * ((dused+1.0)/dvirtual)
+else:
+    print "firmware too old to report capacity properly... or the drobo is empty..."
+    pfull = -1
+
+print dname,"is",pfull,"% full"
+
