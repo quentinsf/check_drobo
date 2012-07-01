@@ -1,13 +1,38 @@
 #! /usr/bin/python
-# Running:
-#    sudo drobom status
-# gives, e.g.
-#    /dev/sdb:/dev/sdc:/dev/sdd /drobo1:/drobo2:/drobo3 Drobo disk pack 50% full - ([], 0)
 #
-# Install drobo-utils.  Much of this is copied from 'drobom'
+# Check a few things about a Drobo and return a Nagios-compliant status
+#
+# This needs to be run with root priviledges.  You might like to put something
+# like the following in /etc/sudoers:
+# 
+#    nagios ALL=(ALL) NOPASSWD: <pathname>/check_drobo
+#
+# Install drobo-utils package, and that will give you the python libraries.
+#  Much of this is copied from 'drobom'
+
+import sys 
+from optparse import OptionParser
 
 def togig(b):
     return b/(1024.0*1024*1024)
+
+def return_OK(info,data=""):
+    print "DROBO OK: %s|%s" % (info, data)
+    sys.exit(0)
+
+def return_WARNING(info,data=""):
+    print "DROBO WARNING: %s|%s" % (info, data)
+    sys.exit(1)
+
+def return_CRITICAL(info,data=""):
+    print "DROBO CRITICAL: %s|%s" % (info, data)
+    sys.exit(2)
+
+def return_UNKNOWN(info,data=""):
+    print "DROBO UNKNOWN: %s|%s" % (info, data)
+    sys.exit(3)
+
+parser = OptionParser()
 
 import Drobo
 l = Drobo.DiscoverLUNs()
@@ -30,8 +55,8 @@ status = d.GetSubPageStatus()
 if dvirtual > 0 :
     pfull = 100 * ((dused+1.0)/dvirtual)
 else:
-    print "firmware too old to report capacity properly... or the drobo is empty..."
-    pfull = -1
+    return_UNKNOWN("Firmware too old or drobo empty")
 
-print dname,"is",pfull,"% full"
+return_OK("%s is %2.2f%% full" % (dname,pfull), 
+          "%2.2f;%2.2f;%2.2f;%2.2f" % (togig(dfree),togig(dused),togig(dvirtual),togig(dunprotected)))
 
