@@ -25,9 +25,11 @@ Then, in your Nagios config, define a command which uses this:
         command_line		sudo /usr/lib/nagios/plugins/check_drobo
     }
 
-and finally a service which uses the command:
+You can modify this to use the -d option to the `check_drobo` script if you want to specify which one of several Drobo devices should be checked.
 
-    define service{
+Then, finally, you can define a service which uses the above command:
+
+    define service {
         use                             generic-service         ; Name of service template to use
         host_name                       localhost
         service_description             Drobo Disk Space

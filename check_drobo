@@ -40,7 +40,7 @@ def main():
         type="int", default="75", help="Percentage full to trigger warning")
     parser.add_option("-c","--critical",dest="critical",
         type="int", default="90", help="Percentage full to trigger critical status")
-     parser.add_option("-d","--device",dest="device",
+    parser.add_option("-d","--device",dest="device",
         type="string", default=None, help="Drobo Device name")
 
     (options, args) = parser.parse_args()
@@ -51,25 +51,28 @@ def main():
     import Drobo
     l = Drobo.DiscoverLUNs()
     if not l:
-      print "No drobos discovered"
-      sys.exit();
+        print "No Drobos discovered"
+        sys.exit();
+
+    # If a device is specified, we search for it in the discovered LUNs,
+    # otherwise we just use the first one.
     match=False
     if options.device != None:
-      for i in l:
-        if type(i) == types.ListType:
-          for j in i:
-            if options.device in j:
-             l=[j]
-             match = True
-        elif options.device in i:
-          l=[i]
-          match = True
+        for i in l:
+            if type(i) == types.ListType:
+                for j in i:
+                    if options.device in j:
+                        l=[j]
+                        match = True
+            elif options.device in i:
+                l=[i]
+                match = True
+        if not match:
+            print "Given device %s is not a Drobo" % options.device
+            sys.exit()
     else:
-      l = l[0]
+        l = l[0]
 
-    if options.device != None and not match:
-      print "given device: %s, is not a Drobo" % options.device
-      sys.exit()
 
     d = Drobo.Drobo(l[0])
 
