@@ -10,7 +10,7 @@
 #    nagios ALL=(ALL) NOPASSWD: <pathname>/check_drobo
 #
 
-import sys, os
+import sys, os, types
 
 from optparse import OptionParser
 
@@ -40,6 +40,9 @@ def main():
         type="int", default="75", help="Percentage full to trigger warning")
     parser.add_option("-c","--critical",dest="critical",
         type="int", default="90", help="Percentage full to trigger critical status")
+     parser.add_option("-d","--device",dest="device",
+        type="string", default=None, help="Drobo Device name")
+
     (options, args) = parser.parse_args()
 
     if os.getuid() != 0:
@@ -47,7 +50,27 @@ def main():
 
     import Drobo
     l = Drobo.DiscoverLUNs()
-    # We just use the first drobo we see
+    if not l:
+      print "No drobos discovered"
+      sys.exit();
+    match=False
+    if options.device != None:
+      for i in l:
+        if type(i) == types.ListType:
+          for j in i:
+            if options.device in j:
+             l=[j]
+             match = True
+        elif options.device in i:
+          l=[i]
+          match = True
+    else:
+      l = l[0]
+
+    if options.device != None and not match:
+      print "given device: %s, is not a Drobo" % options.device
+      sys.exit()
+
     d = Drobo.Drobo(l[0])
 
     # Look at capacity
